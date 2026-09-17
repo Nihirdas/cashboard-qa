@@ -1,0 +1,74 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  hermetic:
+    name: Hermetic (built app)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tests
+        uses: actions/checkout@v4
+      - name: Checkout app
+        uses: actions/checkout@v4
+        with:
+          repository: Nihirdas/cashboard
+          path: app
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build the app
+        working-directory: app
+        run: |
+          npm ci
+          npm run build
+      - name: Install test deps
+        run: npm ci
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+      - name: Run API + E2E against the built app
+        env:
+          APP_DIR: ./app
+        run: npm test
+      - name: Upload HTML report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
+      - name: Upload results JSON
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-json
+          path: test-results/results.json
+          retention-days: 30
+
+  live-smoke:
+    name: Live smoke (production API)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: API smoke against production
+        env:
+          BASE_URL: https://cashboard-pi.vercel.app
+        run: npm run test:api
+      - name: Upload results JSON
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-results-json
+          path: test-results/results.json
+          retention-days: 30
