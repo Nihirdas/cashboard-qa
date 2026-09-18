@@ -4,8 +4,6 @@ on:
   push:
     branches: [main]
   pull_request:
-  schedule:
-    - cron: "0 6 * * 1" # Mondays 06:00 UTC
   workflow_dispatch:
 
 jobs:
@@ -43,17 +41,10 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 30
-      - name: Upload results JSON
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: results-json
-          path: test-results/results.json
-          retention-days: 30
 
   live-smoke:
     name: Live smoke (production API)
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -65,44 +56,3 @@ jobs:
         env:
           BASE_URL: https://cashboard-pi.vercel.app
         run: npm run test:api
-      - name: Upload results JSON
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: live-results-json
-          path: test-results/results.json
-          retention-days: 30
-
-  publish:
-    name: Publish history to dashboard
-    needs: hermetic
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-      - name: Download results
-        uses: actions/download-artifact@v8
-        with:
-          name: results-json
-          path: incoming
-      - name: Update dashboard history
-        env:
-          DASHBOARD_TOKEN: ${{ secrets.DASHBOARD_TOKEN }}
-        run: |
-          if [ -z "$DASHBOARD_TOKEN" ]; then
-            echo "DASHBOARD_TOKEN not set - skipping publish (add the secret to enable auto-update)"
-            exit 0
-          fi
-          git clone --depth 1 "https://x-access-token:${DASHBOARD_TOKEN}@github.com/Nihirdas/cashboard-dashboard.git" dashboard
-          code=$(curl -s -o /dev/null -w "%{http_code}" https://cashboard-pi.vercel.app/api/health)
-          export PROD_HEALTH=$([ "$code" = "200" ] && echo ok || echo down)
-          node scripts/update-history.mjs incoming/results.json dashboard/public/data/history.json
-          cd dashboard
-          git config user.name "Nihirdas"
-          git config user.email "6910112+Nihirdas@users.noreply.github.com"
-          git add public/data/history.json
-          git commit -m "chore: update test history" || { echo "no changes"; exit 0; }
-          git push
