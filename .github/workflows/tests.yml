@@ -30,7 +30,7 @@ jobs:
         run: npm ci
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
-      - name: Run API + E2E against the built app
+      - name: Run API + contract + E2E against the built app
         env:
           APP_DIR: ./app
         run: npm test

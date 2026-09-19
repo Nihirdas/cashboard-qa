@@ -18,6 +18,13 @@ export default defineConfig({
   },
   projects: [
     { name: "api", testDir: "./tests/api" },
+    // Contract: the UI<->API translation. Needs a real browser to observe the
+    // request the panel fires and the cards it renders, so it runs in Chrome.
+    {
+      name: "contract",
+      testDir: "./tests/contract",
+      use: { ...devices["Desktop Chrome"] },
+    },
     { name: "e2e", testDir: "./tests/e2e", use: { ...devices["Desktop Chrome"] } },
   ],
   // Against a remote URL (live smoke) we manage no server. Otherwise start —
